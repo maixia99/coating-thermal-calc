@@ -1,0 +1,1721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- 微信与手机端防缓存设置：确保Gitee更新后客户扫码立即加载最新版 -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>三维交互式建筑围护结构隔热涂料节能与热工机理分析系统 (GB 50176-2016)</title>
+<!-- 依赖 Three.js, OrbitControls 与 Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<style>
+  :root {
+    --bg-dark: #070c14;
+    --card-bg: #0f1726;
+    --card-border: #1e293b;
+    --card-hover: #1b263b;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --accent-blue: #38bdf8;
+    --accent-sky: #0284c7;
+    --accent-emerald: #10b981;
+    --accent-amber: #f59e0b;
+    --accent-rose: #f43f5e;
+    --accent-purple: #a855f7;
+    --accent-indigo: #818cf8;
+    --font-serif: SimSun, "Songti SC", "Noto Serif CJK SC", serif;
+    --font-mono: "Times New Roman", ui-monospace, monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+    line-height: 1.5;
+    padding: 12px;
+  }
+
+  .dashboard-container {
+    max-width: 1760px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* 顶部全局信息与控制栏 */
+  .top-navbar {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 12px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .logo-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-title h1 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.5px;
+  }
+  .tag-badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    color: var(--accent-blue);
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .select-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+  }
+  select, input[type=text], input[type=number] {
+    background: #192336;
+    border: 1px solid var(--card-border);
+    color: #fff;
+    padding: 5px 9px;
+    border-radius: 6px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  select:focus, input:focus {
+    border-color: var(--accent-blue);
+  }
+
+  /* 顶部工程报告导出按钮 */
+  .btn-export {
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    color: #fff;
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 10px rgba(2, 132, 199, 0.3);
+    transition: all 0.2s;
+  }
+  .btn-export:hover {
+    background: linear-gradient(135deg, #0369a1, #0284c7);
+    box-shadow: 0 4px 14px rgba(56, 189, 248, 0.4);
+    transform: translateY(-1px);
+  }
+
+  /* 主体双栏布局 */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1.75fr 1.25fr;
+    gap: 14px;
+  }
+  @media (max-width: 1200px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  /* 左侧：3D 三维交互场景 */
+  .three-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+  .canvas-wrapper {
+    position: relative;
+    width: 100%;
+    height: 610px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #020617;
+    border: 1px solid var(--card-border);
+  }
+  #three-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+  }
+  #three-canvas:active {
+    cursor: grabbing;
+  }
+
+  /* 3D 浮动控制工具栏 */
+  .view-preset-panel {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    display: flex;
+    gap: 6px;
+    background: rgba(15, 23, 42, 0.88);
+    padding: 6px;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    backdrop-filter: blur(10px);
+    z-index: 20;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .view-btn {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: var(--text-muted);
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .view-btn:hover {
+    background: #28374f;
+    color: #fff;
+    border-color: var(--accent-blue);
+  }
+  .view-btn.active {
+    background: #0284c7;
+    color: #fff;
+    border-color: #38bdf8;
+    font-weight: 700;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+  }
+
+  /* 大气窗口展示切换选项 (确认的第3点) */
+  .toggle-space-box {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 6px;
+    padding-left: 8px;
+    border-left: 1px solid #334155;
+    font-size: 12px;
+    color: #cbd5e1;
+    cursor: pointer;
+    user-select: none;
+  }
+  .toggle-space-box input {
+    accent-color: var(--accent-indigo);
+    cursor: pointer;
+  }
+
+  /* 3D 建筑对比模式角标 (设计建筑 vs 参照建筑) */
+  .mode-switch-overlay {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    display: flex;
+    gap: 8px;
+    background: rgba(15, 23, 42, 0.88);
+    padding: 6px;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    backdrop-filter: blur(10px);
+    z-index: 20;
+  }
+  .mode-btn {
+    font-size: 12px;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-muted);
+    transition: all 0.2s;
+  }
+  .mode-btn.active {
+    background: #0284c7;
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 0 12px rgba(2, 132, 199, 0.4);
+  }
+
+  /* 3D 悬浮指示角标 (当前照射朝向与能量动态) */
+  .three-info-overlay {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    background: rgba(15, 23, 42, 0.92);
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    backdrop-filter: blur(10px);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    pointer-events: none;
+  }
+  .info-tag-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tag-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  /* 3D 图例栏 */
+  .three-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding-top: 12px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend-cube {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  /* 右侧：围护结构自定义搭配与 GB 50176 计算核算 */
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .bento-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .bento-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--card-border);
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+  }
+  .bento-header h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .header-actions-sm {
+    display: flex;
+    gap: 6px;
+  }
+  .btn-sm {
+    background: #1e293b;
+    border: 1px solid var(--card-border);
+    color: var(--text-muted);
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-sm:hover {
+    background: #2b3952;
+    color: #fff;
+    border-color: var(--accent-blue);
+  }
+
+  /* 构造层自由搭配表格 (需求1) */
+  .layers-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+  .layer-row {
+    background: #090f19;
+    border: 1px solid #1a2638;
+    border-radius: 8px;
+    padding: 7px 10px;
+    display: grid;
+    grid-template-columns: 24px 1.3fr 1.6fr 75px 65px 24px;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+    transition: border-color 0.2s;
+  }
+  .layer-row:hover {
+    border-color: #2b3e5c;
+  }
+  .layer-index {
+    color: var(--accent-blue);
+    font-family: var(--font-mono);
+    font-weight: 700;
+    text-align: center;
+  }
+  .layer-del-btn {
+    color: var(--accent-rose);
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+  }
+  .layer-del-btn:hover {
+    color: #fda4af;
+  }
+  .layer-num-display {
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    font-size: 11px;
+    text-align: right;
+  }
+
+  /* 构造总成摘要 */
+  .struct-summary-bar {
+    display: flex;
+    justify-content: space-between;
+    background: #0b1320;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px dashed var(--card-border);
+    font-size: 12px;
+    margin-top: 6px;
+    color: var(--text-muted);
+  }
+  .struct-summary-bar strong {
+    color: #38bdf8;
+    font-family: var(--font-mono);
+  }
+
+  /* 涂料参数直接输入区域 (确认的第1点: 方式A直接输入) */
+  .slider-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .slider-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .slider-labels {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+  }
+  .input-direct-num {
+    width: 72px;
+    padding: 2px 6px;
+    text-align: right;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--accent-blue);
+    font-size: 13px;
+  }
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--accent-blue);
+    background: #1a2538;
+    height: 5px;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  /* 合规判定与指标卡片 (确认的第2点: 统一术语为隔热涂料) */
+  .verify-banner {
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    border: 1px solid;
+    transition: all 0.3s;
+  }
+  .verify-banner.pass {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.35);
+  }
+  .verify-banner.fail {
+    background: rgba(244, 63, 94, 0.08);
+    border-color: rgba(244, 63, 94, 0.35);
+  }
+  .verify-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .badge-status {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .badge-status.pass {
+    background: var(--accent-emerald);
+    color: #064e3b;
+  }
+  .badge-status.fail {
+    background: var(--accent-rose);
+    color: #ffe4e6;
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .metric-item {
+    background: #090f19;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .m-label {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .m-val {
+    font-size: 17px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+  }
+
+  /* 采纳的优化建议1: 24小时夏季典型日内表面逐时温度对比曲线 */
+  .chart-card {
+    background: #090f19;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11.5px;
+    color: var(--text-muted);
+  }
+  .chart-wrapper {
+    position: relative;
+    width: 100%;
+    height: 120px;
+  }
+
+  /* 底部公式卡片 */
+  .footer-bar {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 12px 18px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  @media (max-width: 900px) {
+    .footer-bar { grid-template-columns: 1fr; }
+  }
+  .formula-item strong {
+    color: #e2e8f0;
+    display: block;
+    margin-bottom: 2px;
+  }
+  .code-snip {
+    font-family: var(--font-mono);
+    color: var(--accent-blue);
+    background: #090f19;
+    padding: 3px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-top: 3px;
+  }
+
+  /* 打印与导出模式特定样式 */
+  @media print {
+    body { background: #fff; color: #000; padding: 0; }
+    .top-navbar, .footer-bar, .view-preset-panel, .mode-switch-overlay, .header-actions-sm { display: none !important; }
+    .main-grid { display: block; }
+    .three-card, .bento-card { border: 1px solid #ccc; background: #fff; color: #000; margin-bottom: 15px; page-break-inside: avoid; }
+    .m-val, .metric-item, .verify-banner { color: #000 !important; background: #fafafa !important; border-color: #ddd !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="dashboard-container">
+  <!-- 顶部导航栏 -->
+  <div class="top-navbar">
+    <div class="logo-title">
+      <h1>🏛️ 三维交互式建筑围护结构隔热涂料节能与热工机理分析系统</h1>
+      <span class="tag-badge">GB 50176-2016 规范联动</span>
+    </div>
+
+    <!-- 全局快捷选项与导出功能 -->
+    <div class="header-actions">
+      <div class="select-group">
+        <span>城市:</span>
+        <select id="sel-city"></select>
+      </div>
+      <div class="select-group">
+        <span>构件类型:</span>
+        <select id="sel-elem">
+          <option value="外墙" selected>外墙</option>
+          <option value="屋面">屋面</option>
+        </select>
+      </div>
+      <div class="select-group">
+        <span>受热朝向:</span>
+        <select id="sel-orient">
+          <option value="西向" selected>西向 (最不利)</option>
+          <option value="东向">东向</option>
+          <option value="南向">南向</option>
+          <option value="北向">北向</option>
+          <option value="水平">顶面 / 水平 (平屋面)</option>
+        </select>
+      </div>
+      <div class="select-group">
+        <span>长波修正 ΔTsky:</span>
+        <select id="sel-skyfix">
+          <option value="启用" selected>启用 (ε·30/αe)</option>
+          <option value="停用">停用 (ΔTsky=0)</option>
+        </select>
+      </div>
+      <!-- 采纳的优化建议3: 一键导出工程计算核算单 -->
+      <button class="btn-export" onclick="exportCalculationReport()">
+        <span>📥</span>
+        <span>导出工程核算单</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 主体工作区 -->
+  <div class="main-grid">
+    <!-- 左侧：3D 三维交互场景与视角控制 -->
+    <div class="three-card">
+      <!-- 视角快捷预设控制 + 确认的第3点: 大气透明窗口展示开关 -->
+      <div class="view-preset-panel">
+        <span style="font-size:11px; color:#94a3b8; display:flex; align-items:center; margin-right:4px;">视角:</span>
+        <button class="view-btn active" onclick="switchView('west')">西面 (West)</button>
+        <button class="view-btn" onclick="switchView('south')">南面 (South)</button>
+        <button class="view-btn" onclick="switchView('east')">东面 (East)</button>
+        <button class="view-btn" onclick="switchView('north')">北面 (North)</button>
+        <button class="view-btn" onclick="switchView('top')">顶面 / 屋顶 (Top)</button>
+        <button class="view-btn" onclick="switchView('iso')">轴侧 (3D)</button>
+
+        <!-- 确认的第3点：大气透明窗口作为可选项 -->
+        <label class="toggle-space-box" title="勾选显示向外太空 8~13 μm 大气窗口辐射散热通道，取消则隐藏">
+          <input type="checkbox" id="chk-show-space" checked onchange="toggleAtmosphericWindow(this.checked)">
+          <span>大气透明窗口 (8~13 μm)</span>
+        </label>
+      </div>
+
+      <!-- 方案切换 (确认的第2点: 规范命名为隔热涂料系统) -->
+      <div class="mode-switch-overlay">
+        <button class="mode-btn active" id="btn-mode-design" onclick="setBuildingMode('design')">✨ 【设计建筑】隔热涂料系统</button>
+        <button class="mode-btn" id="btn-mode-ref" onclick="setBuildingMode('ref')">🧱 【参照建筑】基准常规外饰面</button>
+      </div>
+
+      <!-- 3D Canvas 容器 -->
+      <div class="canvas-wrapper">
+        <canvas id="three-canvas"></canvas>
+
+        <!-- 3D 浮动提示：实时动线与机理状态 -->
+        <div class="three-info-overlay">
+          <div class="info-tag-row">
+            <span class="tag-dot" style="background:#f59e0b;"></span>
+            <strong id="lbl-sun-direction">太阳入射: 西向 | 照度 650 W/m²</strong>
+          </div>
+          <div class="info-tag-row">
+            <span class="tag-dot" style="background:#38bdf8;"></span>
+            <span id="lbl-reflect-direction">表面高反射 (ρ_solar): 80%</span>
+          </div>
+          <div class="info-tag-row" id="row-space-indicator">
+            <span class="tag-dot" style="background:#818cf8;"></span>
+            <span id="lbl-space-direction">8~13 μm 大气窗口辐射散热通道已开启 (ε = 0.90)</span>
+          </div>
+          <div class="info-tag-row">
+            <span class="tag-dot" style="background:#f43f5e;"></span>
+            <span>高空平流天穹逆辐射 G_atm (受对流层水汽长波漫射)</span>
+          </div>
+          <div style="font-size:11px; color:#64748b; margin-top:2px;">
+            💡 鼠标左键拖动 360° 旋转 | 滚轮缩放 | 右键平移
+          </div>
+        </div>
+      </div>
+
+      <!-- 3D 图例栏 -->
+      <div class="three-legend">
+        <div class="legend-item"><div class="legend-cube" style="background:#f59e0b;"></div><span>天穹主平行太阳光</span></div>
+        <div class="legend-item"><div class="legend-cube" style="background:#38bdf8;"></div><span>隔热涂料高反射光束群</span></div>
+        <div class="legend-item"><div class="legend-cube" style="background:#818cf8;"></div><span>向天长波辐射 (8~13 μm 大气窗口)</span></div>
+        <div class="legend-item"><div class="legend-cube" style="background:#f43f5e;"></div><span>高空平流大气逆辐射</span></div>
+        <div class="legend-item"><div class="legend-cube" style="background:#10b981;"></div><span>表面对流热阻抗 (αe=19)</span></div>
+      </div>
+    </div>
+
+    <!-- 右侧：围护结构自定义搭配与 GB 50176 计算引擎 -->
+    <div class="side-panel">
+      <!-- 1. 围护结构构造搭配自由编辑器 -->
+      <div class="bento-card">
+        <div class="bento-header">
+          <h3>
+            <span>🧱 围护结构构造自由搭配 (由外至内)</span>
+          </h3>
+          <div class="header-actions-sm">
+            <button class="btn-sm" onclick="loadPresetStruct('aerogel_aac')">气凝胶+加气块</button>
+            <button class="btn-sm" onclick="loadPresetStruct('xps_concrete')">XPS+混凝土</button>
+            <button class="btn-sm" onclick="loadPresetStruct('roof_insul')">倒置屋面</button>
+            <button class="btn-sm" style="color:var(--accent-emerald);" onclick="addNewLayer()">+ 加一层</button>
+          </div>
+        </div>
+
+        <!-- 构造层列表 -->
+        <div class="layers-editor" id="layers-container"></div>
+
+        <!-- 构造总成指标条 -->
+        <div class="struct-summary-bar">
+          <span>总厚度: <strong id="lbl-total-thick">254 mm</strong></span>
+          <span>材料热阻 R: <strong id="lbl-total-r">1.625</strong></span>
+          <span>热惰性 D: <strong id="lbl-total-d">3.352</strong></span>
+          <span>特性: <strong id="lbl-total-type" style="color:var(--accent-emerald)">重质 (D≥2.5)</strong></span>
+        </div>
+      </div>
+
+      <!-- 2. 饰面层污染后物性参数输入 (确认的第1点: 方式A直接输入) -->
+      <div class="bento-card">
+        <div class="bento-header">
+          <h3>
+            <span>🎨 隔热涂料饰面层参数 (污染后直接输入)</span>
+            <span style="font-size:11px; font-weight:normal; color:var(--text-muted);">GB 50176 表3.4.11</span>
+          </h3>
+        </div>
+
+        <div class="slider-stack">
+          <!-- 污染后太阳光反射比 -->
+          <div class="slider-box">
+            <div class="slider-labels">
+              <span style="color:var(--accent-blue);">🔄 污染后太阳光反射比 ρ (0.10 ~ 0.96)</span>
+              <div>
+                <input type="number" id="num-rho" class="input-direct-num" min="0.10" max="0.96" step="0.01" value="0.80" onchange="syncInputRho(this.value)">
+              </div>
+            </div>
+            <input type="range" id="rng-rho" min="0.10" max="0.96" step="0.01" value="0.80" oninput="syncInputRho(this.value)">
+          </div>
+
+          <!-- 污染后半球发射率 -->
+          <div class="slider-box">
+            <div class="slider-labels">
+              <span style="color:var(--accent-indigo);">🌌 污染后半球发射率 ε (0.20 ~ 0.98)</span>
+              <div>
+                <input type="number" id="num-eps" class="input-direct-num" min="0.20" max="0.98" step="0.01" value="0.90" onchange="syncInputEps(this.value)">
+              </div>
+            </div>
+            <input type="range" id="rng-eps" min="0.20" max="0.98" step="0.01" value="0.90" oninput="syncInputEps(this.value)">
+          </div>
+
+          <!-- 室内计算温度 -->
+          <div class="slider-box">
+            <div class="slider-labels">
+              <span>❄️ 室内空调计算温度 ti (℃)</span>
+              <div>
+                <input type="number" id="num-ti" class="input-direct-num" min="20" max="28" step="0.5" value="26.0" onchange="syncInputTi(this.value)">
+              </div>
+            </div>
+            <input type="range" id="rng-ti" min="20" max="28" step="0.5" value="26.0" oninput="syncInputTi(this.value)">
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. GB 50176 规范限值核查看板与逐时温变图 -->
+      <div class="bento-card">
+        <div class="bento-header">
+          <h3>
+            <span>⚖️ GB 50176 限值核定与节能收益</span>
+            <span style="font-size:11px; font-weight:normal; color:var(--text-muted);" id="lbl-code-clause">第 6.1.1 条</span>
+          </h3>
+        </div>
+
+        <!-- 判定 Banner (确认的第2点: 命名统一为隔热涂料系统) -->
+        <div class="verify-banner pass" id="verify-box">
+          <div class="verify-title-row">
+            <strong id="verify-title">【设计建筑】隔热涂料系统</strong>
+            <span class="badge-status pass" id="verify-badge">合格 PASS</span>
+          </div>
+          <div style="font-size: 12px; color: var(--text-main);" id="verify-desc">
+            内表面最高温 26.76 ℃ ≤ 规范限值 28.00 ℃ (安全裕量: 1.24 ℃)
+          </div>
+        </div>
+
+        <!-- 核心热工指标四宫格 -->
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <span class="m-label">内表面最高温度 θi,max</span>
+            <span class="m-val" id="met-theta-i" style="color:#38bdf8;">26.76 ℃</span>
+          </div>
+          <div class="metric-item">
+            <span class="m-label">规范限值 θi,max,limit</span>
+            <span class="m-val" id="met-limit" style="color:#fbbf24;">28.00 ℃</span>
+          </div>
+          <div class="metric-item">
+            <span class="m-label">最高室外综合温度 tse,max</span>
+            <span class="m-val" id="met-tse-max" style="color:#f59e0b;">42.72 ℃</span>
+          </div>
+          <div class="metric-item">
+            <span class="m-label">峰值冷负荷相对削减率</span>
+            <span class="m-val" id="met-save-rate" style="color:#10b981;">50.8%</span>
+          </div>
+        </div>
+
+        <!-- 采纳的优化建议1: 24小时夏季典型日内表面逐时温度对比曲线 -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <strong>📈 夏季典型日 24h 内表面逐时温度波动对比</strong>
+            <span style="font-size:11px; color:var(--accent-blue)">削平温度尖峰</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="tempCurveChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部原理与工程依据 -->
+  <div class="footer-bar">
+    <div class="formula-item">
+      <strong>1. 室外综合温度计算 (GB 50176 式 3.4.11)</strong>
+      <span>综合室外气温、隔热涂料反射后太阳得热与向天长波冷却：</span>
+      <div class="code-snip">tse,max = te,max + (ρs·Imax / αe) - ΔTsky</div>
+    </div>
+    <div class="formula-item">
+      <strong>2. 围护结构周期传热衰减 (热惰性指标 D)</strong>
+      <span>温度波幅经构造层层衰减阻隔后传入内表面：</span>
+      <div class="code-snip">θi,max = ti + (Ri/R0)·(tse,avg - ti) + (θe / ν)</div>
+    </div>
+    <div class="formula-item">
+      <strong>3. 隔热涂料向天长波辐射冷却机理</strong>
+      <span>利用 8~13 μm 大气窗口将热量发射至 3 K 深冷外太空：</span>
+      <div class="code-snip">ΔTsky = ε·30 / αe [有效拉降外表面综合温约 1.5 ℃]</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 1. 注入城市气象与材料数据库
+const CITY_DB = {"深圳": {"province": "广东", "climate_zone": "夏热冬暖B", "te_max": 37.3, "te": 30.5, "rad": {"东向": {"Imax": 620.0, "Iavg": 170.0}, "南向": {"Imax": 380.0, "Iavg": 145.0}, "西向": {"Imax": 650.0, "Iavg": 175.0}, "北向": {"Imax": 190.0, "Iavg": 95.0}, "水平": {"Imax": 950.0, "Iavg": 310.0}}}, "广州": {"province": "广东", "climate_zone": "夏热冬暖B", "te_max": 38.1, "te": 30.2, "rad": {"东向": {"Imax": 615.0, "Iavg": 168.0}, "南向": {"Imax": 385.0, "Iavg": 142.0}, "西向": {"Imax": 645.0, "Iavg": 172.0}, "北向": {"Imax": 195.0, "Iavg": 98.0}, "水平": {"Imax": 940.0, "Iavg": 305.0}}}, "汕头": {"province": "广东", "climate_zone": "夏热冬暖B", "te_max": 36.8, "te": 29.8, "rad": {"东向": {"Imax": 625.0, "Iavg": 172.0}, "南向": {"Imax": 375.0, "Iavg": 140.0}, "西向": {"Imax": 655.0, "Iavg": 178.0}, "北向": {"Imax": 190.0, "Iavg": 92.0}, "水平": {"Imax": 960.0, "Iavg": 315.0}}}, "南宁": {"province": "广西", "climate_zone": "夏热冬暖B", "te_max": 38.5, "te": 30.0, "rad": {"东向": {"Imax": 620.0, "Iavg": 170.0}, "南向": {"Imax": 390.0, "Iavg": 146.0}, "西向": {"Imax": 650.0, "Iavg": 176.0}, "北向": {"Imax": 200.0, "Iavg": 100.0}, "水平": {"Imax": 950.0, "Iavg": 310.0}}}, "海口": {"province": "海南", "climate_zone": "夏热冬暖B", "te_max": 38.8, "te": 30.1, "rad": {"东向": {"Imax": 630.0, "Iavg": 175.0}, "南向": {"Imax": 360.0, "Iavg": 135.0}, "西向": {"Imax": 660.0, "Iavg": 180.0}, "北向": {"Imax": 210.0, "Iavg": 105.0}, "水平": {"Imax": 980.0, "Iavg": 320.0}}}, "三亚": {"province": "海南", "climate_zone": "夏热冬暖B", "te_max": 36.2, "te": 29.5, "rad": {"东向": {"Imax": 635.0, "Iavg": 178.0}, "南向": {"Imax": 350.0, "Iavg": 130.0}, "西向": {"Imax": 665.0, "Iavg": 182.0}, "北向": {"Imax": 215.0, "Iavg": 110.0}, "水平": {"Imax": 990.0, "Iavg": 325.0}}}, "福州": {"province": "福建", "climate_zone": "夏热冬暖A", "te_max": 39.2, "te": 30.6, "rad": {"东向": {"Imax": 630.0, "Iavg": 174.0}, "南向": {"Imax": 400.0, "Iavg": 150.0}, "西向": {"Imax": 660.0, "Iavg": 180.0}, "北向": {"Imax": 190.0, "Iavg": 95.0}, "水平": {"Imax": 960.0, "Iavg": 315.0}}}, "厦门": {"province": "福建", "climate_zone": "夏热冬暖B", "te_max": 37.0, "te": 29.7, "rad": {"东向": {"Imax": 625.0, "Iavg": 171.0}, "南向": {"Imax": 385.0, "Iavg": 144.0}, "西向": {"Imax": 655.0, "Iavg": 177.0}, "北向": {"Imax": 192.0, "Iavg": 94.0}, "水平": {"Imax": 950.0, "Iavg": 312.0}}}, "上海": {"province": "上海", "climate_zone": "夏热冬冷A", "te_max": 38.6, "te": 29.5, "rad": {"东向": {"Imax": 600.0, "Iavg": 165.0}, "南向": {"Imax": 430.0, "Iavg": 160.0}, "西向": {"Imax": 630.0, "Iavg": 170.0}, "北向": {"Imax": 180.0, "Iavg": 90.0}, "水平": {"Imax": 920.0, "Iavg": 295.0}}}, "杭州": {"province": "浙江", "climate_zone": "夏热冬冷A", "te_max": 39.5, "te": 30.0, "rad": {"东向": {"Imax": 605.0, "Iavg": 168.0}, "南向": {"Imax": 435.0, "Iavg": 162.0}, "西向": {"Imax": 635.0, "Iavg": 172.0}, "北向": {"Imax": 185.0, "Iavg": 92.0}, "水平": {"Imax": 930.0, "Iavg": 300.0}}}, "南京": {"province": "江苏", "climate_zone": "夏热冬冷A", "te_max": 39.0, "te": 29.8, "rad": {"东向": {"Imax": 600.0, "Iavg": 165.0}, "南向": {"Imax": 440.0, "Iavg": 165.0}, "西向": {"Imax": 630.0, "Iavg": 170.0}, "北向": {"Imax": 180.0, "Iavg": 90.0}, "水平": {"Imax": 920.0, "Iavg": 295.0}}}, "武汉": {"province": "湖北", "climate_zone": "夏热冬冷A", "te_max": 39.3, "te": 30.2, "rad": {"东向": {"Imax": 610.0, "Iavg": 168.0}, "南向": {"Imax": 445.0, "Iavg": 168.0}, "西向": {"Imax": 640.0, "Iavg": 174.0}, "北向": {"Imax": 185.0, "Iavg": 92.0}, "水平": {"Imax": 935.0, "Iavg": 302.0}}}, "长沙": {"province": "湖南", "climate_zone": "夏热冬冷A", "te_max": 39.8, "te": 30.5, "rad": {"东向": {"Imax": 615.0, "Iavg": 170.0}, "南向": {"Imax": 440.0, "Iavg": 165.0}, "西向": {"Imax": 645.0, "Iavg": 175.0}, "北向": {"Imax": 185.0, "Iavg": 92.0}, "水平": {"Imax": 940.0, "Iavg": 305.0}}}, "南昌": {"province": "江西", "climate_zone": "夏热冬冷A", "te_max": 39.7, "te": 30.4, "rad": {"东向": {"Imax": 610.0, "Iavg": 169.0}, "南向": {"Imax": 440.0, "Iavg": 165.0}, "西向": {"Imax": 640.0, "Iavg": 174.0}, "北向": {"Imax": 185.0, "Iavg": 92.0}, "水平": {"Imax": 935.0, "Iavg": 302.0}}}, "重庆": {"province": "重庆", "climate_zone": "夏热冬冷B", "te_max": 40.5, "te": 31.0, "rad": {"东向": {"Imax": 590.0, "Iavg": 160.0}, "南向": {"Imax": 430.0, "Iavg": 160.0}, "西向": {"Imax": 620.0, "Iavg": 168.0}, "北向": {"Imax": 175.0, "Iavg": 88.0}, "水平": {"Imax": 900.0, "Iavg": 285.0}}}, "成都": {"province": "四川", "climate_zone": "夏热冬冷A", "te_max": 36.5, "te": 28.0, "rad": {"东向": {"Imax": 560.0, "Iavg": 150.0}, "南向": {"Imax": 410.0, "Iavg": 150.0}, "西向": {"Imax": 590.0, "Iavg": 158.0}, "北向": {"Imax": 160.0, "Iavg": 80.0}, "水平": {"Imax": 860.0, "Iavg": 270.0}}}, "合肥": {"province": "安徽", "climate_zone": "夏热冬冷A", "te_max": 38.5, "te": 29.6, "rad": {"东向": {"Imax": 600.0, "Iavg": 165.0}, "南向": {"Imax": 440.0, "Iavg": 165.0}, "西向": {"Imax": 630.0, "Iavg": 170.0}, "北向": {"Imax": 180.0, "Iavg": 90.0}, "水平": {"Imax": 920.0, "Iavg": 295.0}}}, "北京": {"province": "北京", "climate_zone": "寒冷B", "te_max": 39.0, "te": 28.5, "rad": {"东向": {"Imax": 590.0, "Iavg": 160.0}, "南向": {"Imax": 480.0, "Iavg": 180.0}, "西向": {"Imax": 620.0, "Iavg": 168.0}, "北向": {"Imax": 170.0, "Iavg": 85.0}, "水平": {"Imax": 910.0, "Iavg": 290.0}}}, "天津": {"province": "天津", "climate_zone": "寒冷B", "te_max": 38.8, "te": 28.3, "rad": {"东向": {"Imax": 595.0, "Iavg": 162.0}, "南向": {"Imax": 475.0, "Iavg": 178.0}, "西向": {"Imax": 625.0, "Iavg": 170.0}, "北向": {"Imax": 172.0, "Iavg": 86.0}, "水平": {"Imax": 915.0, "Iavg": 292.0}}}, "石家庄": {"province": "河北", "climate_zone": "寒冷B", "te_max": 40.0, "te": 29.2, "rad": {"东向": {"Imax": 600.0, "Iavg": 165.0}, "南向": {"Imax": 470.0, "Iavg": 175.0}, "西向": {"Imax": 630.0, "Iavg": 172.0}, "北向": {"Imax": 175.0, "Iavg": 88.0}, "水平": {"Imax": 920.0, "Iavg": 295.0}}}, "济南": {"province": "山东", "climate_zone": "寒冷B", "te_max": 39.5, "te": 29.0, "rad": {"东向": {"Imax": 605.0, "Iavg": 166.0}, "南向": {"Imax": 465.0, "Iavg": 172.0}, "西向": {"Imax": 635.0, "Iavg": 174.0}, "北向": {"Imax": 175.0, "Iavg": 88.0}, "水平": {"Imax": 925.0, "Iavg": 298.0}}}, "青岛": {"province": "山东", "climate_zone": "寒冷A", "te_max": 35.5, "te": 26.5, "rad": {"东向": {"Imax": 590.0, "Iavg": 160.0}, "南向": {"Imax": 460.0, "Iavg": 170.0}, "西向": {"Imax": 620.0, "Iavg": 168.0}, "北向": {"Imax": 170.0, "Iavg": 85.0}, "水平": {"Imax": 910.0, "Iavg": 290.0}}}, "郑州": {"province": "河南", "climate_zone": "寒冷B", "te_max": 39.8, "te": 29.5, "rad": {"东向": {"Imax": 605.0, "Iavg": 168.0}, "南向": {"Imax": 460.0, "Iavg": 170.0}, "西向": {"Imax": 635.0, "Iavg": 175.0}, "北向": {"Imax": 175.0, "Iavg": 88.0}, "水平": {"Imax": 930.0, "Iavg": 300.0}}}, "西安": {"province": "陕西", "climate_zone": "寒冷B", "te_max": 40.2, "te": 29.8, "rad": {"东向": {"Imax": 600.0, "Iavg": 165.0}, "南向": {"Imax": 465.0, "Iavg": 172.0}, "西向": {"Imax": 630.0, "Iavg": 172.0}, "北向": {"Imax": 175.0, "Iavg": 88.0}, "水平": {"Imax": 925.0, "Iavg": 298.0}}}};
+const MAT_DB = {"钢筋混凝土": {"category": "混凝土类", "lambda": 1.74, "S": 17.2, "rho": 2500.0, "c": 0.92, "a": 1.0, "lambda_c": 1.74}, "普通混凝土": {"category": "混凝土类", "lambda": 1.51, "S": 15.36, "rho": 2300.0, "c": 0.92, "a": 1.0, "lambda_c": 1.51}, "加气混凝土砌块(B05)": {"category": "混凝土类", "lambda": 0.14, "S": 2.31, "rho": 500.0, "c": 1.05, "a": 1.25, "lambda_c": 0.175}, "加气混凝土砌块(B07)": {"category": "混凝土类", "lambda": 0.18, "S": 3.1, "rho": 700.0, "c": 1.05, "a": 1.25, "lambda_c": 0.225}, "陶粒混凝土(1200级)": {"category": "混凝土类", "lambda": 0.53, "S": 7.25, "rho": 1200.0, "c": 1.05, "a": 1.15, "lambda_c": 0.6095}, "水泥砂浆": {"category": "砂浆与抹灰", "lambda": 0.93, "S": 11.37, "rho": 1800.0, "c": 1.05, "a": 1.0, "lambda_c": 0.93}, "聚合物水泥防水砂浆": {"category": "砂浆与抹灰", "lambda": 0.93, "S": 11.37, "rho": 1800.0, "c": 1.05, "a": 1.0, "lambda_c": 0.93}, "混合砂浆": {"category": "砂浆与抹灰", "lambda": 0.87, "S": 10.75, "rho": 1700.0, "c": 1.05, "a": 1.0, "lambda_c": 0.87}, "石膏砂浆": {"category": "砂浆与抹灰", "lambda": 0.33, "S": 5.28, "rho": 1050.0, "c": 1.05, "a": 1.0, "lambda_c": 0.33}, "烧结普通砖砌体": {"category": "砌体类", "lambda": 0.81, "S": 10.63, "rho": 1800.0, "c": 1.05, "a": 1.0, "lambda_c": 0.81}, "烧结多孔砖砌体": {"category": "砌体类", "lambda": 0.58, "S": 7.92, "rho": 1400.0, "c": 1.05, "a": 1.0, "lambda_c": 0.58}, "蒸压灰砂砖砌体": {"category": "砌体类", "lambda": 1.1, "S": 12.72, "rho": 1900.0, "c": 1.05, "a": 1.0, "lambda_c": 1.1}, "混凝土小型空心砌块": {"category": "砌体类", "lambda": 0.65, "S": 8.5, "rho": 1300.0, "c": 1.05, "a": 1.1, "lambda_c": 0.715}, "岩棉板(外保温)": {"category": "保温材料", "lambda": 0.041, "S": 0.6, "rho": 120.0, "c": 1.22, "a": 1.3, "lambda_c": 0.0533}, "岩棉板(内保温)": {"category": "保温材料", "lambda": 0.041, "S": 0.6, "rho": 120.0, "c": 1.22, "a": 1.25, "lambda_c": 0.0513}, "模塑聚苯板(EPS外墙)": {"category": "保温材料", "lambda": 0.039, "S": 0.28, "rho": 20.0, "c": 1.38, "a": 1.1, "lambda_c": 0.0429}, "挤塑聚苯板(XPS外墙)": {"category": "保温材料", "lambda": 0.03, "S": 0.34, "rho": 35.0, "c": 1.38, "a": 1.2, "lambda_c": 0.036}, "挤塑聚苯板(XPS屋面)": {"category": "保温材料", "lambda": 0.03, "S": 0.34, "rho": 35.0, "c": 1.38, "a": 1.2, "lambda_c": 0.036}, "硬泡聚氨酯板(PU外墙)": {"category": "保温材料", "lambda": 0.024, "S": 0.29, "rho": 35.0, "c": 1.38, "a": 1.25, "lambda_c": 0.03}, "气凝胶绝热涂料/毡": {"category": "保温材料", "lambda": 0.015, "S": 0.25, "rho": 150.0, "c": 1.0, "a": 1.1, "lambda_c": 0.0165}, "无机轻集料保温砂浆": {"category": "保温材料", "lambda": 0.07, "S": 0.95, "rho": 350.0, "c": 1.05, "a": 1.2, "lambda_c": 0.084}, "水泥陶瓦/烧结瓦": {"category": "金属与饰面", "lambda": 0.69, "S": 9.5, "rho": 1800.0, "c": 0.92, "a": 1.0, "lambda_c": 0.69}, "彩色压型钢板": {"category": "金属与饰面", "lambda": 58.2, "S": 126.0, "rho": 7850.0, "c": 0.48, "a": 1.0, "lambda_c": 58.2}, "铝合金板": {"category": "金属与饰面", "lambda": 203.0, "S": 191.0, "rho": 2700.0, "c": 0.92, "a": 1.0, "lambda_c": 203.0}};
+
+// 2. 状态机
+const state = {
+  city: '深圳',
+  elem: '外墙',
+  orient: '西向',
+  skyfix: '启用',
+  showAtmosphericWindow: true, // 确认第3点
+  buildingMode: 'design',      // 'design' | 'ref'
+  currentView: 'west',
+  ti: 26.0,
+  Ri: 0.11,
+  Re: 0.05,
+  alpha_e: 19.0,
+  // 涂层参数 (设计建筑: 确认第1点方式A直接输入)
+  design_rho: 0.80,
+  design_eps: 0.90,
+  // 涂层参数 (参照建筑基准)
+  ref_rho: 0.30,
+  ref_eps: 0.80,
+  // 围护结构自定义搭配层 (由外至内)
+  layers: [
+    { name: '面层/中涂', mat: '气凝胶绝热涂料/毡', delta: 4 },
+    { name: '外保温层', mat: '加气混凝土砌块(B05)', delta: 240 },
+    { name: '内抹灰层', mat: '水泥砂浆', delta: 10 }
+  ]
+};
+
+// 预设构造方案
+const STRUCT_PRESETS = {
+  aerogel_aac: [
+    { name: '面层/中涂', mat: '气凝胶绝热涂料/毡', delta: 4 },
+    { name: '外保温层', mat: '加气混凝土砌块(B05)', delta: 240 },
+    { name: '内抹灰层', mat: '水泥砂浆', delta: 10 }
+  ],
+  xps_concrete: [
+    { name: '薄抹灰保护层', mat: '聚合物水泥防水砂浆', delta: 5 },
+    { name: '外保温层', mat: '挤塑聚苯板(XPS外墙)', delta: 50 },
+    { name: '主体结构', mat: '钢筋混凝土', delta: 200 },
+    { name: '内抹灰层', mat: '水泥砂浆', delta: 15 }
+  ],
+  roof_insul: [
+    { name: '饰面防滑砖', mat: '水泥陶瓦/烧结瓦', delta: 15 },
+    { name: '防水找平层', mat: '聚合物水泥防水砂浆', delta: 20 },
+    { name: '高效保温层', mat: '挤塑聚苯板(XPS屋面)', delta: 60 },
+    { name: '屋面板主体', mat: '钢筋混凝土', delta: 120 }
+  ]
+};
+
+// 3. Three.js 三维场景系统 (天球级太阳 + 高空平流大气层)
+let scene, camera, renderer, controls;
+let buildingGroup, sunDistantGroup, atmosphereGroup, radiationBeamsGroup;
+let westWallMesh, eastWallMesh, southWallMesh, northWallMesh, roofMesh;
+let raySolarGroup, rayReflectGroup, raySpaceGroup;
+
+function initThree() {
+  const container = document.getElementById('three-canvas');
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x040813);
+  scene.fog = new THREE.FogExp2(0x040813, 0.012);
+
+  camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+  camera.position.set(-28, 16, 26); // 经典视角
+
+  renderer = new THREE.WebGLRenderer({ canvas: container, antialias: true, alpha: true, preserveDrawingBuffer: true });
+  renderer.setSize(width, height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  controls.maxPolarAngle = Math.PI / 2 - 0.02;
+  controls.minDistance = 12;
+  controls.maxDistance = 90;
+  controls.target.set(0, 4, 0);
+
+  // 环境光
+  const ambientLight = new THREE.AmbientLight(0x334460, 1.4);
+  scene.add(ambientLight);
+
+  // 地面网格与基座
+  const groundGeo = new THREE.PlaneGeometry(180, 180);
+  const groundMat = new THREE.MeshStandardMaterial({ color: 0x070e1b, roughness: 0.9, metalness: 0.1 });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  const grid = new THREE.GridHelper(120, 60, 0x1e293b, 0x0f172a);
+  grid.position.y = 0.02;
+  scene.add(grid);
+
+  // 构建组件
+  buildBuildingModel();
+  buildDistantSun();
+  buildAtmosphereSkyLayer();
+  buildRadiationRays();
+
+  window.addEventListener('resize', onWindowResize);
+  animate();
+}
+
+// 构建 3D 建筑体
+function buildBuildingModel() {
+  buildingGroup = new THREE.Group();
+
+  // 1. 基底台座
+  const baseGeo = new THREE.BoxGeometry(16, 0.6, 14);
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+  const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+  baseMesh.position.y = 0.3;
+  baseMesh.receiveShadow = true;
+  buildingGroup.add(baseMesh);
+
+  // 2. 四周墙体构建
+  const wallMatBase = new THREE.MeshStandardMaterial({
+    color: 0x1a2638,
+    roughness: 0.7,
+    metalness: 0.2
+  });
+
+  // 西向主立面墙 (X = -6) - 最不利受热面
+  const westGeo = new THREE.BoxGeometry(0.5, 7, 12);
+  westWallMesh = new THREE.Mesh(westGeo, wallMatBase.clone());
+  westWallMesh.position.set(-6, 4.1, 0);
+  westWallMesh.castShadow = true;
+  westWallMesh.receiveShadow = true;
+  buildingGroup.add(westWallMesh);
+
+  // 窗户
+  const winGeo = new THREE.BoxGeometry(0.6, 2.4, 3.2);
+  const winMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2, metalness: 0.9, transparent: true, opacity: 0.7 });
+  const winWest = new THREE.Mesh(winGeo, winMat);
+  winWest.position.set(-6, 4.2, 0);
+  buildingGroup.add(winWest);
+
+  // 东向立面墙 (X = +6)
+  const eastGeo = new THREE.BoxGeometry(0.5, 7, 12);
+  eastWallMesh = new THREE.Mesh(eastGeo, wallMatBase.clone());
+  eastWallMesh.position.set(6, 4.1, 0);
+  eastWallMesh.castShadow = true;
+  eastWallMesh.receiveShadow = true;
+  buildingGroup.add(eastWallMesh);
+
+  // 南向立面墙 (Z = +6)
+  const southGeo = new THREE.BoxGeometry(12, 7, 0.5);
+  southWallMesh = new THREE.Mesh(southGeo, wallMatBase.clone());
+  southWallMesh.position.set(0, 4.1, 6);
+  southWallMesh.castShadow = true;
+  southWallMesh.receiveShadow = true;
+  buildingGroup.add(southWallMesh);
+
+  // 北向立面墙 (Z = -6)
+  const northGeo = new THREE.BoxGeometry(12, 7, 0.5);
+  northWallMesh = new THREE.Mesh(northGeo, wallMatBase.clone());
+  northWallMesh.position.set(0, 4.1, -6);
+  northWallMesh.castShadow = true;
+  northWallMesh.receiveShadow = true;
+  buildingGroup.add(northWallMesh);
+
+  // 3. 坡屋顶与挑檐 (顶面)
+  const roofShape = new THREE.Shape();
+  roofShape.moveTo(-7.2, 0);
+  roofShape.lineTo(0, 3.6);
+  roofShape.lineTo(7.2, 0);
+  roofShape.closePath();
+
+  const extrudeSettings = { depth: 14, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.3, bevelThickness: 0.3 };
+  const roofGeo = new THREE.ExtrudeGeometry(roofShape, extrudeSettings);
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x1e2f47, roughness: 0.5, metalness: 0.3 });
+  roofMesh = new THREE.Mesh(roofGeo, roofMat);
+  roofMesh.position.set(0, 7.6, -7);
+  roofMesh.castShadow = true;
+  roofMesh.receiveShadow = true;
+  buildingGroup.add(roofMesh);
+
+  // 4. 西墙多层剖切构造视窗展示 (Cutaway)
+  const cutawayGroup = new THREE.Group();
+  cutawayGroup.position.set(-6.3, 4.2, -3.2);
+  const lColors = [0x38bdf8, 0x0284c7, 0x475569, 0x94a3b8];
+  const lThicks = [0.08, 0.16, 0.5, 0.12];
+  let curX = 0;
+  for (let i = 0; i < 4; i++) {
+    const cg = new THREE.BoxGeometry(lThicks[i], 2.2, 2.0);
+    const cm = new THREE.MeshStandardMaterial({ color: lColors[i], roughness: 0.6 });
+    const cmMesh = new THREE.Mesh(cg, cm);
+    cmMesh.position.x = curX;
+    curX += lThicks[i] + 0.04;
+    cutawayGroup.add(cmMesh);
+  }
+  buildingGroup.add(cutawayGroup);
+
+  scene.add(buildingGroup);
+}
+
+// 构建高空远景平行日照太阳 (重构方案: 无穷远天球定位，不挡视线)
+function buildDistantSun() {
+  sunDistantGroup = new THREE.Group();
+
+  // 远景太阳发光球 (放置在远距离穹顶)
+  const sunGeo = new THREE.SphereGeometry(3.5, 32, 32);
+  const sunMat = new THREE.MeshBasicMaterial({ color: 0xfffbeb });
+  const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+  sunDistantGroup.add(sunMesh);
+
+  // 太阳日冕光辉
+  const coronaGeo = new THREE.SphereGeometry(7.0, 32, 32);
+  const coronaMat = new THREE.MeshBasicMaterial({
+    color: 0xf59e0b,
+    transparent: true,
+    opacity: 0.45,
+    blending: THREE.AdditiveBlending
+  });
+  sunDistantGroup.add(new THREE.Mesh(coronaGeo, coronaMat));
+
+  // 平行日照强光源
+  const sunLight = new THREE.DirectionalLight(0xfff7ed, 2.6);
+  sunLight.position.set(0, 0, 0);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.width = 1024;
+  sunLight.shadow.mapSize.height = 1024;
+  sunLight.shadow.camera.near = 1;
+  sunLight.shadow.camera.far = 150;
+  const d = 25;
+  sunLight.shadow.camera.left = -d;
+  sunLight.shadow.camera.right = d;
+  sunLight.shadow.camera.top = d;
+  sunLight.shadow.camera.bottom = -d;
+  sunDistantGroup.add(sunLight);
+
+  // 放置在远景高空
+  sunDistantGroup.position.set(-65, 45, 15);
+  scene.add(sunDistantGroup);
+}
+
+// 构建高空平流大气天穹层 (重构方案: 取消低空石膏块，采用平流宏观半透明层)
+function buildAtmosphereSkyLayer() {
+  atmosphereGroup = new THREE.Group();
+
+  // 高空半透明平流大气/云气层 (Y = 32~36)
+  const cloudLayerGeo = new THREE.PlaneGeometry(160, 160);
+  const cloudLayerMat = new THREE.MeshStandardMaterial({
+    color: 0x475569,
+    roughness: 0.8,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.35,
+    side: THREE.DoubleSide
+  });
+  const cloudCeiling = new THREE.Mesh(cloudLayerGeo, cloudLayerMat);
+  cloudCeiling.rotation.x = Math.PI / 2;
+  cloudCeiling.position.y = 35;
+  atmosphereGroup.add(cloudCeiling);
+
+  // 大气逆辐射向下漫射动线粒子组 (红粉微光流束)
+  for (let i = 0; i < 4; i++) {
+    const rGeo = new THREE.CylinderGeometry(0.06, 0.06, 22, 6);
+    const rMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e, transparent: true, opacity: 0.6 });
+    const ray = new THREE.Mesh(rGeo, rMat);
+    ray.position.set(10 + i*4, 22, 8 + i*2);
+    ray.rotation.x = 0.2;
+    atmosphereGroup.add(ray);
+  }
+
+  scene.add(atmosphereGroup);
+}
+
+// 构建动态机理能量光束组
+function buildRadiationRays() {
+  radiationBeamsGroup = new THREE.Group();
+
+  // 1. 入射太阳短波辐射光线束 (金黄平行光流)
+  raySolarGroup = new THREE.Group();
+  for (let i = 0; i < 5; i++) {
+    const rGeo = new THREE.CylinderGeometry(0.08, 0.08, 36, 8);
+    const rMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.85 });
+    const ray = new THREE.Mesh(rGeo, rMat);
+    ray.position.set(-18 + i*1.2, 16, 4 - i*0.8);
+    ray.rotation.z = Math.PI / 4 + 0.1;
+    ray.rotation.x = 0.15;
+    raySolarGroup.add(ray);
+  }
+  radiationBeamsGroup.add(raySolarGroup);
+
+  // 2. 隔热涂料高反射光线束 (天蓝光流)
+  rayReflectGroup = new THREE.Group();
+  for (let i = 0; i < 4; i++) {
+    const rGeo = new THREE.CylinderGeometry(0.09, 0.09, 20, 8);
+    const rMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85 });
+    const ray = new THREE.Mesh(rGeo, rMat);
+    ray.position.set(-6, 4.2 + i*0.8, -2 + i*1.4);
+    ray.rotation.z = -Math.PI / 4;
+    rayReflectGroup.add(ray);
+  }
+  radiationBeamsGroup.add(rayReflectGroup);
+
+  // 3. 8~13 μm 大气窗口向外太空辐射光束通道 (幽蓝垂直光柱，受第3点开关控制)
+  raySpaceGroup = new THREE.Group();
+  const spaceBeamGeo = new THREE.CylinderGeometry(0.8, 3.2, 42, 16);
+  const spaceBeamMat = new THREE.MeshBasicMaterial({
+    color: 0x818cf8,
+    transparent: true,
+    opacity: 0.32,
+    blending: THREE.AdditiveBlending
+  });
+  const spaceBeam = new THREE.Mesh(spaceBeamGeo, spaceBeamMat);
+  spaceBeam.position.set(-2, 28, 0);
+  raySpaceGroup.add(spaceBeam);
+
+  for (let i = 0; i < 3; i++) {
+    const rGeo = new THREE.CylinderGeometry(0.12, 0.12, 38, 8);
+    const rMat = new THREE.MeshBasicMaterial({ color: 0xc7d2fe, transparent: true, opacity: 0.9 });
+    const ray = new THREE.Mesh(rGeo, rMat);
+    ray.position.set(-3.5 + i*2.2, 26, 0);
+    raySpaceGroup.add(ray);
+  }
+  radiationBeamsGroup.add(raySpaceGroup);
+
+  scene.add(radiationBeamsGroup);
+}
+
+// 确认的第3点：大气透明窗口展示开关控制
+window.toggleAtmosphericWindow = function(show) {
+  state.showAtmosphericWindow = show;
+  if (raySpaceGroup) {
+    raySpaceGroup.visible = show;
+  }
+  const row = document.getElementById('row-space-indicator');
+  if (row) {
+    row.style.display = show ? 'flex' : 'none';
+  }
+};
+
+// 视角平滑切换动画系统
+let isAnimatingCamera = false;
+let targetCamPos = new THREE.Vector3();
+let targetLookAt = new THREE.Vector3(0, 4, 0);
+
+function switchView(viewName) {
+  state.currentView = viewName;
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  if (viewName === 'west') {
+    targetCamPos.set(-28, 5, 0);
+    state.orient = '西向';
+    state.elem = '外墙';
+  } else if (viewName === 'east') {
+    targetCamPos.set(28, 5, 0);
+    state.orient = '东向';
+    state.elem = '外墙';
+  } else if (viewName === 'south') {
+    targetCamPos.set(0, 5, 28);
+    state.orient = '南向';
+    state.elem = '外墙';
+  } else if (viewName === 'north') {
+    targetCamPos.set(0, 5, -28);
+    state.orient = '北向';
+    state.elem = '外墙';
+  } else if (viewName === 'top') {
+    targetCamPos.set(0, 36, 0.1);
+    state.orient = '水平';
+    state.elem = '屋面';
+  } else if (viewName === 'iso') {
+    targetCamPos.set(-26, 16, 26);
+  }
+
+  document.getElementById('sel-orient').value = state.orient;
+  document.getElementById('sel-elem').value = state.elem;
+
+  updateSunPositionByOrient(state.orient);
+  isAnimatingCamera = true;
+  calculateAll();
+}
+
+function updateSunPositionByOrient(orient) {
+  if (!sunDistantGroup) return;
+  if (orient === '西向') {
+    sunDistantGroup.position.set(-65, 45, 15);
+    raySolarGroup.rotation.y = 0;
+  } else if (orient === '东向') {
+    sunDistantGroup.position.set(65, 45, 15);
+    raySolarGroup.rotation.y = Math.PI;
+  } else if (orient === '南向') {
+    sunDistantGroup.position.set(15, 45, 65);
+    raySolarGroup.rotation.y = -Math.PI / 2;
+  } else if (orient === '北向') {
+    sunDistantGroup.position.set(15, 45, -65);
+    raySolarGroup.rotation.y = Math.PI / 2;
+  } else if (orient === '水平') {
+    sunDistantGroup.position.set(5, 75, 5);
+  }
+}
+
+function onWindowResize() {
+  const container = document.getElementById('three-canvas');
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+
+let clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const time = clock.getElapsedTime();
+
+  if (isAnimatingCamera) {
+    camera.position.lerp(targetCamPos, 0.08);
+    controls.target.lerp(targetLookAt, 0.08);
+    if (camera.position.distanceTo(targetCamPos) < 0.2) {
+      isAnimatingCamera = false;
+    }
+  }
+
+  if (raySpaceGroup && raySpaceGroup.visible) {
+    raySpaceGroup.position.y = Math.sin(time * 2.2) * 0.3;
+  }
+  if (rayReflectGroup) {
+    rayReflectGroup.position.y = Math.sin(time * 2.8) * 0.2;
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// 4. 围护结构自由搭配功能
+function renderLayersEditor() {
+  const container = document.getElementById('layers-container');
+  container.innerHTML = '';
+
+  state.layers.forEach((layer, idx) => {
+    const row = document.createElement('div');
+    row.className = 'layer-row';
+
+    let matOptions = '';
+    Object.keys(MAT_DB).forEach(mName => {
+      const sel = (mName === layer.mat) ? 'selected' : '';
+      matOptions += `<option value="${mName}" ${sel}>${mName} [λ=${MAT_DB[mName].lambda_c}]</option>`;
+    });
+
+    const m = MAT_DB[layer.mat] || { lambda_c: 0.1, S: 2.0 };
+    const R_val = (layer.delta / 1000) / m.lambda_c;
+    const D_val = R_val * m.S;
+
+    row.innerHTML = `
+      <span class="layer-index">#${idx+1}</span>
+      <input type="text" value="${layer.name}" placeholder="层次名" onchange="updateLayerField(${idx}, 'name', this.value)" style="width:100%;">
+      <select onchange="updateLayerField(${idx}, 'mat', this.value)" style="width:100%;">
+        ${matOptions}
+      </select>
+      <div style="display:flex; align-items:center; gap:2px;">
+        <input type="number" min="1" max="1000" step="1" value="${layer.delta}" onchange="updateLayerField(${idx}, 'delta', parseFloat(this.value))" style="width:52px; padding:3px 4px;">
+        <span style="font-size:10px; color:#64748b;">mm</span>
+      </div>
+      <div class="layer-num-display">
+        R=${R_val.toFixed(2)}<br>D=${D_val.toFixed(2)}
+      </div>
+      <button class="layer-del-btn" title="删除该层" onclick="deleteLayer(${idx})">×</button>
+    `;
+    container.appendChild(row);
+  });
+
+  calculateAll();
+}
+
+window.updateLayerField = function(idx, field, val) {
+  if (state.layers[idx]) {
+    state.layers[idx][field] = val;
+    renderLayersEditor();
+  }
+};
+
+window.deleteLayer = function(idx) {
+  if (state.layers.length <= 1) {
+    alert('围护结构至少保留一个构造层！');
+    return;
+  }
+  state.layers.splice(idx, 1);
+  renderLayersEditor();
+};
+
+window.addNewLayer = function() {
+  state.layers.push({
+    name: '新增保温/隔热层',
+    mat: '岩棉板(外保温)',
+    delta: 50
+  });
+  renderLayersEditor();
+};
+
+window.loadPresetStruct = function(type) {
+  if (STRUCT_PRESETS[type]) {
+    state.layers = JSON.parse(JSON.stringify(STRUCT_PRESETS[type]));
+    renderLayersEditor();
+  }
+};
+
+// 确认的第1点: 方式A直接输入与滑块双向同步
+window.syncInputRho = function(val) {
+  let num = parseFloat(val);
+  if (isNaN(num)) num = 0.80;
+  num = Math.max(0.10, Math.min(0.96, num));
+  state.design_rho = num;
+  document.getElementById('num-rho').value = num.toFixed(2);
+  document.getElementById('rng-rho').value = num.toFixed(2);
+  calculateAll();
+};
+
+window.syncInputEps = function(val) {
+  let num = parseFloat(val);
+  if (isNaN(num)) num = 0.90;
+  num = Math.max(0.20, Math.min(0.98, num));
+  state.design_eps = num;
+  document.getElementById('num-eps').value = num.toFixed(2);
+  document.getElementById('rng-eps').value = num.toFixed(2);
+  calculateAll();
+};
+
+window.syncInputTi = function(val) {
+  let num = parseFloat(val);
+  if (isNaN(num)) num = 26.0;
+  num = Math.max(20.0, Math.min(28.0, num));
+  state.ti = num;
+  document.getElementById('num-ti').value = num.toFixed(1);
+  document.getElementById('rng-ti').value = num.toFixed(1);
+  calculateAll();
+};
+
+// 5. 采纳的优化建议1: 24h 内表面逐时温度对比图表 (Chart.js)
+let tempCurveChartInstance = null;
+
+function initOrUpdateChart(designCurve, refCurve, limitVal) {
+  const ctx = document.getElementById('tempCurveChart').getContext('2d');
+  const labels = ['0:00','2:00','4:00','6:00','8:00','10:00','12:00','14:00','16:00','18:00','20:00','22:00','24:00'];
+  const limitLine = Array(labels.length).fill(limitVal);
+
+  if (!tempCurveChartInstance) {
+    tempCurveChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: '隔热涂料系统',
+            data: designCurve,
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+            borderWidth: 2,
+            tension: 0.35,
+            pointRadius: 0
+          },
+          {
+            label: '基准常规外饰面',
+            data: refCurve,
+            borderColor: '#f43f5e',
+            backgroundColor: 'transparent',
+            borderWidth: 1.8,
+            borderDash: [4, 4],
+            tension: 0.35,
+            pointRadius: 0
+          },
+          {
+            label: '规范限值',
+            data: limitLine,
+            borderColor: '#fbbf24',
+            borderWidth: 1.2,
+            borderDash: [2, 2],
+            pointRadius: 0,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: { color: '#94a3b8', boxWidth: 10, font: { size: 10 } }
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#64748b', font: { size: 9 } }
+          },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#94a3b8', font: { size: 9 } }
+          }
+        }
+      }
+    });
+  } else {
+    tempCurveChartInstance.data.datasets[0].data = designCurve;
+    tempCurveChartInstance.data.datasets[1].data = refCurve;
+    tempCurveChartInstance.data.datasets[2].data = limitLine;
+    tempCurveChartInstance.update();
+  }
+}
+
+// 6. GB 50176 计算引擎与状态同步
+function calculateAll() {
+  const cData = CITY_DB[state.city] || CITY_DB['深圳'];
+  const te_max = cData.te_max;
+  const te = cData.te;
+
+  const radObj = cData.rad[state.orient] || cData.rad['西向'];
+  const Imax = radObj.Imax;
+  const Iavg = radObj.Iavg;
+
+  // 1. 围护结构热工性能累加
+  let totalThick = 0;
+  let totalR_solid = 0;
+  let totalD = 0;
+
+  state.layers.forEach(l => {
+    const m = MAT_DB[l.mat];
+    if (m && l.delta > 0) {
+      totalThick += l.delta;
+      const R_i = (l.delta / 1000) / m.lambda_c;
+      totalR_solid += R_i;
+      totalD += R_i * m.S;
+    }
+  });
+
+  const R0 = state.Ri + totalR_solid + state.Re;
+  const K = 1.0 / R0;
+  const nu = 0.9 * Math.exp(totalD);
+
+  document.getElementById('lbl-total-thick').innerText = totalThick.toFixed(0) + ' mm';
+  document.getElementById('lbl-total-r').innerText = totalR_solid.toFixed(3);
+  document.getElementById('lbl-total-d').innerText = totalD.toFixed(3);
+  const isHeavy = totalD >= 2.5;
+  document.getElementById('lbl-total-type').innerText = isHeavy ? '重质构造 (D≥2.5)' : '轻质构造 (D<2.5)';
+  document.getElementById('lbl-total-type').style.color = isHeavy ? 'var(--accent-emerald)' : 'var(--accent-amber)';
+
+  // 2. 设计建筑 vs 参照建筑
+  const isDesign = (state.buildingMode === 'design');
+  const rho = isDesign ? state.design_rho : state.ref_rho;
+  const eps = isDesign ? state.design_eps : state.ref_eps;
+  const rho_s = 1.0 - rho;
+
+  // 天空长波辐射修正
+  const deltaT_sky = (state.skyfix === '启用') ? (eps * 30.0 / state.alpha_e) : 0;
+
+  // 室外综合温度
+  const tse_max = te_max + (rho_s * Imax / state.alpha_e) - deltaT_sky;
+  const tse_avg = te + (rho_s * Iavg / state.alpha_e) - deltaT_sky;
+  const theta_e = tse_max - tse_avg;
+
+  // 内表面最高温度
+  const theta_i_avg = state.ti + (state.Ri / R0) * (tse_avg - state.ti);
+  const theta_i_amp = theta_e / nu;
+  const theta_i_max = theta_i_avg + theta_i_amp;
+
+  // 参照建筑对照
+  const ref_rho_s = 1.0 - state.ref_rho;
+  const ref_deltaT_sky = (state.skyfix === '启用') ? (state.ref_eps * 30.0 / state.alpha_e) : 0;
+  const ref_tse_max = te_max + (ref_rho_s * Imax / state.alpha_e) - ref_deltaT_sky;
+  const ref_tse_avg = te + (ref_rho_s * Iavg / state.alpha_e) - ref_deltaT_sky;
+  const ref_theta_e = ref_tse_max - ref_tse_avg;
+  const ref_theta_i_avg = state.ti + (state.Ri / R0) * (ref_tse_avg - state.ti);
+  const ref_theta_i_amp = ref_theta_e / nu;
+  const ref_theta_i_max = ref_theta_i_avg + ref_theta_i_amp;
+
+  const ref_qmax = K * (ref_tse_max - state.ti);
+  const cur_qmax = K * (tse_max - state.ti);
+  const save_rate = Math.max(0, (ref_qmax - cur_qmax) / (ref_qmax > 0 ? ref_qmax : 1.0)) * 100;
+
+  // 规范限值判定 (GB 50176 第6.1.1条)
+  let limit = 0;
+  if (state.elem === '屋面') {
+    limit = isHeavy ? (state.ti + 2.5) : (state.ti + 3.5);
+  } else {
+    limit = isHeavy ? (state.ti + 2.0) : (state.ti + 3.0);
+  }
+  // 按两位小数工程修约后进行规范限值判定，消除浮点数微小误差 (如 28.0001 导致误判)
+  const theta_i_max_num = parseFloat(theta_i_max.toFixed(2));
+  const limit_num = parseFloat(limit.toFixed(2));
+  const isPass = (theta_i_max_num <= limit_num);
+  const margin = parseFloat((limit_num - theta_i_max_num).toFixed(2));
+
+  // 更新指标卡
+  document.getElementById('met-theta-i').innerText = theta_i_max.toFixed(2) + ' ℃';
+  document.getElementById('met-limit').innerText = limit.toFixed(2) + ' ℃';
+  document.getElementById('met-tse-max').innerText = tse_max.toFixed(2) + ' ℃';
+  document.getElementById('met-save-rate').innerText = isDesign ? (save_rate.toFixed(1) + '%') : '0.0% (基准)';
+
+  // 3D 浮动提示同步
+  document.getElementById('lbl-sun-direction').innerText = `太阳入射: ${state.orient} | 照度 ${Imax.toFixed(0)} W/m²`;
+  document.getElementById('lbl-reflect-direction').innerText = `表面高反射 (ρ_solar): ${Math.round(rho*100)}%`;
+  document.getElementById('lbl-space-direction').innerText = `8~13 μm 大气窗口辐射散热通道已开启 (ε = ${eps.toFixed(2)}, ΔTsky = ${deltaT_sky.toFixed(2)} ℃)`;
+
+  // 判定 Banner (确认的第2点: 统一命名为【设计建筑】隔热涂料系统)
+  const vBox = document.getElementById('verify-box');
+  const vBadge = document.getElementById('verify-badge');
+  const vTitle = document.getElementById('verify-title');
+  const vDesc = document.getElementById('verify-desc');
+
+  vTitle.innerText = isDesign ? '【设计建筑】隔热涂料系统' : '【参照建筑】基准常规外饰面';
+  if (isPass) {
+    vBox.className = 'verify-banner pass';
+    vBadge.className = 'badge-status pass';
+    vBadge.innerText = '合格 PASS';
+    vDesc.innerText = `内表面最高温 ${theta_i_max.toFixed(2)} ℃ ≤ 规范限值 ${limit.toFixed(2)} ℃ (安全裕量: ${margin.toFixed(2)} ℃)`;
+  } else {
+    vBox.className = 'verify-banner fail';
+    vBadge.className = 'badge-status fail';
+    vBadge.innerText = '超标 FAIL';
+    vDesc.innerText = `内表面最高温 ${theta_i_max.toFixed(2)} ℃ 超出限值 ${limit.toFixed(2)} ℃ (超温幅度: ${Math.abs(margin).toFixed(2)} ℃)`;
+  }
+
+  // 3D 建筑材质色彩动态响应
+  updateThreeMaterials(isDesign, isPass);
+
+  // 7. 生成 24h 逐时温度波动曲线 (优化建议1)
+  const designCurve = [];
+  const refCurve = [];
+  // 模拟24小时简谐波 (正午14:00~16:00达到峰值)
+  for (let h = 0; h <= 24; h += 2) {
+    const phase = ((h - 15) / 24) * 2 * Math.PI;
+    const wave = Math.cos(phase);
+    // 设计建筑内表面逐时温
+    const t_design = (state.ti + (state.Ri / R0) * (tse_avg - state.ti)) + (theta_i_amp * wave);
+    // 参照建筑内表面逐时温
+    const t_ref = (state.ti + (state.Ri / R0) * (ref_tse_avg - state.ti)) + (ref_theta_i_amp * wave);
+    designCurve.push(Number(t_design.toFixed(2)));
+    refCurve.push(Number(t_ref.toFixed(2)));
+  }
+  initOrUpdateChart(designCurve, refCurve, limit);
+}
+
+function updateThreeMaterials(isDesign, isPass) {
+  if (!westWallMesh || !roofMesh) return;
+  if (isDesign) {
+    westWallMesh.material.color.set(0x1e3650);
+    roofMesh.material.color.set(0x1a4066);
+    if (rayReflectGroup) rayReflectGroup.visible = true;
+    if (raySpaceGroup) raySpaceGroup.visible = state.showAtmosphericWindow;
+  } else {
+    westWallMesh.material.color.set(0x4a2a1b);
+    roofMesh.material.color.set(0x572a1e);
+    if (rayReflectGroup) rayReflectGroup.visible = false;
+    if (raySpaceGroup) raySpaceGroup.visible = false;
+  }
+}
+
+window.setBuildingMode = function(mode) {
+  state.buildingMode = mode;
+  document.getElementById('btn-mode-design').classList.toggle('active', mode === 'design');
+  document.getElementById('btn-mode-ref').classList.toggle('active', mode === 'ref');
+  calculateAll();
+};
+
+// 采纳的优化建议3: 一键导出工程计算核算报告
+window.exportCalculationReport = function() {
+  const cData = CITY_DB[state.city];
+  const reportHtml = `
+    <!DOCTYPE html>
+    <html lang="zh-CN">
+    <head>
+      <meta charset="utf-8">
+      <title>建筑围护结构隔热涂料隔热性能计算与核定报告 (GB 50176-2016)</title>
+      <style>
+        body { font-family: SimSun, "Times New Roman", serif; padding: 30px; line-height: 1.6; color: #111; }
+        h2, h3 { text-align: center; margin-bottom: 8px; }
+        .header-table, .data-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+        .header-table td { padding: 6px; border: 1px solid #ccc; }
+        .data-table th, .data-table td { padding: 7px; border: 1px solid #333; text-align: center; font-size: 13px; }
+        .data-table th { background: #f3f4f6; }
+        .result-box { padding: 14px; border: 2px solid #0284c7; background: #f0f9ff; margin: 18px 0; border-radius: 6px; }
+        .stamp { text-align: right; margin-top: 30px; font-weight: bold; }
+      </style>
+    </head>
+    <body>
+      <h2>建筑围护结构隔热涂料隔热性能计算与核定报告</h2>
+      <h3>依据《民用建筑热工设计规范》GB 50176-2016 第6.1.1条</h3>
+      
+      <table class="header-table">
+        <tr>
+          <td><strong>工程所在地:</strong> ${state.city} (${cData.climate_zone})</td>
+          <td><strong>构件类型:</strong> ${state.elem}</td>
+          <td><strong>受热朝向:</strong> ${state.orient}</td>
+          <td><strong>室内空调设定温度:</strong> ${state.ti} ℃</td>
+        </tr>
+        <tr>
+          <td><strong>污染后反射比 ρ:</strong> ${state.design_rho}</td>
+          <td><strong>污染后发射率 ε:</strong> ${state.design_eps}</td>
+          <td><strong>长波天空修正 ΔTsky:</strong> ${state.skyfix}</td>
+          <td><strong>峰值辐射照度 Imax:</strong> ${cData.rad[state.orient].Imax} W/m²</td>
+        </tr>
+      </table>
+
+      <h4>一、 围护结构构造搭配层次与热惰性明细</h4>
+      <table class="data-table">
+        <tr><th>序号</th><th>层次名称</th><th>采用材料</th><th>厚度 δ (mm)</th><th>计算导热系数 λc</th><th>热阻 R</th><th>热惰性 D</th></tr>
+        ${state.layers.map((l, i) => {
+          const m = MAT_DB[l.mat] || { lambda_c: 0.1, S: 2 };
+          const r = (l.delta/1000)/m.lambda_c;
+          return `<tr><td>${i+1}</td><td>${l.name}</td><td>${l.mat}</td><td>${l.delta}</td><td>${m.lambda_c}</td><td>${r.toFixed(3)}</td><td>${(r*m.S).toFixed(3)}</td></tr>`;
+        }).join('')}
+      </table>
+
+      <h4>二、 GB 50176 周期传热核定结果对比 (设计建筑 vs 参照建筑)</h4>
+      <div class="result-box">
+        <strong>核查结论:</strong> ${document.getElementById('verify-desc').innerText}<br>
+        <strong>设计建筑内表面最高温 θi,max:</strong> ${document.getElementById('met-theta-i').innerText} | 
+        <strong>规范限值:</strong> ${document.getElementById('met-limit').innerText}<br>
+        <strong>最高室外综合温度 tse,max:</strong> ${document.getElementById('met-tse-max').innerText} | 
+        <strong>峰值冷负荷削减率:</strong> ${document.getElementById('met-save-rate').innerText}
+      </div>
+
+      <div class="stamp">
+        计算机构 / 设计人: 建筑隔热节能设计系统<br>
+        核准日期: ${new Date().toLocaleDateString()}
+      </div>
+    </body>
+    </html>
+  `;
+  const win = window.open('', '_blank');
+  win.document.write(reportHtml);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 400);
+};
+
+// 事件初始化
+function initEvents() {
+  const selCity = document.getElementById('sel-city');
+  Object.keys(CITY_DB).forEach(city => {
+    const opt = document.createElement('option');
+    opt.value = city;
+    opt.innerText = city + ' (' + CITY_DB[city].climate_zone + ')';
+    if (city === '深圳') opt.selected = true;
+    selCity.appendChild(opt);
+  });
+
+  selCity.addEventListener('change', () => { state.city = selCity.value; calculateAll(); });
+  document.getElementById('sel-elem').addEventListener('change', (e) => { state.elem = e.target.value; calculateAll(); });
+  document.getElementById('sel-orient').addEventListener('change', (e) => {
+    state.orient = e.target.value;
+    updateSunPositionByOrient(state.orient);
+    calculateAll();
+  });
+  document.getElementById('sel-skyfix').addEventListener('change', (e) => { state.skyfix = e.target.value; calculateAll(); });
+}
+
+// 启动执行
+window.addEventListener('DOMContentLoaded', () => {
+  initEvents();
+  initThree();
+  renderLayersEditor();
+});
+</script>
+</body>
+</html>
